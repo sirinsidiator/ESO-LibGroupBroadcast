@@ -93,7 +93,6 @@ end
 function LibGroupBroadcast:Initialize()
     internal.gameApiWrapper = internal.class.GameApiWrapper:New(authKey, "LibGroupBroadcast", internal.callbackManager)
     SetupInstance(internal)
-    internal:InitializeSettingsPanel()
     internal.authKey = nil
     self.internal = nil
     self.Initialize = nil
@@ -105,4 +104,5 @@ EVENT_MANAGER:RegisterForEvent("LibGroupBroadcast", EVENT_ADD_ON_LOADED, functio
     local saveData = internal.class.SaveData:New()
     internal.protocolManager:SetSaveData(saveData)
     internal.broadcastManager:SetSaveData(saveData)
+    internal:InitializeSettingsPanel()
 end)
