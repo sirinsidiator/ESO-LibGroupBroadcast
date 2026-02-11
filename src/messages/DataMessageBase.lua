@@ -48,6 +48,14 @@ function DataMessageBase:ShouldDeleteQueuedMessages()
     return self.options.replaceQueuedMessages == true
 end
 
+function DataMessageBase:IsPartiallySent()
+    return false
+end
+
+function DataMessageBase:IsBlockedByPartiallySent(partiallySentIds)
+    return false
+end
+
 function DataMessageBase:ShouldRequeue()
     return false
 end

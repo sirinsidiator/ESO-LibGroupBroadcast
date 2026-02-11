@@ -302,5 +302,30 @@ Taneth("LibGroupBroadcast", function()
             assert.equals("group2", received[2].unitTag)
             assert.equals(textB, received[2].text)
         end)
+
+        it.async("should be able to send and receive two big messages on the same protocol", function(done)
+            local internal = LGB.SetupMockInstance()
+
+            local outgoingA = { text = string.rep("a", 255) }
+            local outgoingB = { text = string.rep("b", 255) }
+            local received = {}
+
+            local handler = internal.handlerManager:RegisterHandler("test")
+            local protocol = handler:DeclareProtocol(0, "test")
+            assert.is_not_nil(protocol)
+            protocol:AddField(StringField:New("text"))
+            protocol:OnData(function(unitTag, data)
+                received[#received + 1] = data.text
+                if #received == 2 then
+                    assert.equals(outgoingA.text, received[1])
+                    assert.equals(outgoingB.text, received[2])
+                    done()
+                end
+            end)
+            protocol:Finalize({ replaceQueuedMessages = false })
+
+            assert.is_true(protocol:Send(outgoingA))
+            assert.is_true(protocol:Send(outgoingB))
+        end)
     end)
 end)
