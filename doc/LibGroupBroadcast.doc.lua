@@ -768,8 +768,6 @@ function GameApiWrapper:IsInCombat() end
 
 function GameApiWrapper:IsGrouped() end
 
-function GameApiWrapper:IsInOfflineMode() end
-
 function GameApiWrapper:BroadcastData(buffer) end
 
 function GameApiWrapper:OnDataReceived(unitTag, ...) end
@@ -794,10 +792,6 @@ function MockGameApiWrapper:SetInCombat(inCombat) end
 function MockGameApiWrapper:IsGrouped() end
 
 function MockGameApiWrapper:SetGrouped(inGroup) end
-
-function MockGameApiWrapper:IsInOfflineMode() end
-
-function MockGameApiWrapper:SetInOfflineMode(isInOfflineMode) end
 
 function MockGameApiWrapper:BroadcastData(buffer) end
 
@@ -829,6 +823,8 @@ function MessageQueue:GetOldestRelevantMessage(inCombat) end
 function MessageQueue:GetNextRelevantEntry(inCombat) end
 
 function MessageQueue:GetNextRelevantEntryWithExactSize(size, inCombat) end
+
+function MessageQueue:IsBlockedByPartiallySent(message) end
 
 
 --- @class HandlerManager
