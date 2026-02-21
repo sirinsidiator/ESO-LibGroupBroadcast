@@ -31,6 +31,10 @@ function GetDisplayName()
     return "@player"
 end
 
+function GetUnitDisplayName(unitTag)
+    return "@" .. unitTag
+end
+
 if RegisterForGroupAddOnDataBroadcastAuthKey then return end
 
 EVENT_GROUP_ADD_ON_DATA_RECEIVED = 131222
