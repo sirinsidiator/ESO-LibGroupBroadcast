@@ -82,20 +82,19 @@ function BroadcastManager:FillSendBuffer(inCombat)
 
     local toRequeue = {}
     local queue = self.dataMessageQueue
-    local partiallySentIds = queue:GetPartiallySentIds()
-    local message = queue:GetOldestRelevantMessage(inCombat, partiallySentIds)
+    local message = queue:GetOldestRelevantMessage(inCombat)
     AddMessage(message, frameHandler, toRequeue)
 
     while frameHandler:GetBytesFree() > 3 do
-        message = queue:GetNextRelevantEntry(inCombat, partiallySentIds)
+        message = queue:GetNextRelevantEntry(inCombat)
         if not AddMessage(message, frameHandler, toRequeue) then break end
     end
 
     local bytesFree = frameHandler:GetBytesFree()
     if bytesFree > 1 and bytesFree <= 3 then
-        message = queue:GetNextRelevantEntryWithExactSize(3, inCombat, partiallySentIds)
+        message = queue:GetNextRelevantEntryWithExactSize(3, inCombat)
         if not message then
-            message = queue:GetNextRelevantEntry(inCombat, partiallySentIds)
+            message = queue:GetNextRelevantEntry(inCombat)
         end
         AddMessage(message, frameHandler, toRequeue)
     end

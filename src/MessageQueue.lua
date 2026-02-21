@@ -28,6 +28,7 @@ LGB.internal.class.MessageQueue = MessageQueue
 function MessageQueue:Initialize()
     self.nextId = 1
     self.messages = {}
+    self.partialMessageForProtocol = {}
 end
 
 function MessageQueue:Clear(reason)
@@ -35,12 +36,21 @@ function MessageQueue:Clear(reason)
         self.messages[i]:SetDequeued(reason or "cleared")
         self.messages[i] = nil
     end
+
+    ZO_ClearTable(self.partialMessageForProtocol)
 end
 
 --- @param message DataMessageBase
 function MessageQueue:EnqueueMessage(message)
     if message:ShouldDeleteQueuedMessages() then
         self:DeleteMessagesByProtocolId(message:GetId())
+    end
+
+    local protocolId = message:GetId()
+    if message:IsPartiallySent() then
+        assert(not self.partialMessageForProtocol[protocolId],
+            "Only one partially sent message per protocol is allowed in the queue")
+        self.partialMessageForProtocol[protocolId] = message
     end
 
     message:SetQueued(self.nextId)
@@ -54,6 +64,12 @@ function MessageQueue:DequeueMessage(i)
 
     local message = table.remove(self.messages, i)
     message:SetDequeued("dequeued")
+
+    local protocolId = message:GetId()
+    if self.partialMessageForProtocol[protocolId] == message then
+        self.partialMessageForProtocol[protocolId] = nil
+    end
+
     return message
 end
 
@@ -63,23 +79,16 @@ function MessageQueue:DeleteMessagesByProtocolId(protocolId, reason)
         if self.messages[i]:GetId() == protocolId then
             local message = table.remove(self.messages, i)
             message:SetDequeued(reason or "deleted")
+
+            if self.partialMessageForProtocol[protocolId] == message then
+                self.partialMessageForProtocol[protocolId] = nil
+            end
         end
     end
 end
 
 function MessageQueue:GetSize()
     return #self.messages
-end
-
-function MessageQueue:GetPartiallySentIds()
-    local ids
-    for _, message in ipairs(self.messages) do
-        if message:IsPartiallySent() then
-            if not ids then ids = {} end
-            ids[message:GetId()] = true
-        end
-    end
-    return ids
 end
 
 function MessageQueue:HasRelevantMessages(inCombat)
@@ -95,7 +104,7 @@ function MessageQueue:HasRelevantMessages(inCombat)
     end
 end
 
-function MessageQueue:GetOldestRelevantMessage(inCombat, partiallySentIds)
+function MessageQueue:GetOldestRelevantMessage(inCombat)
     if #self.messages == 0 then return end
 
     table.sort(self.messages, byTimeAddedDesc)
@@ -103,40 +112,20 @@ function MessageQueue:GetOldestRelevantMessage(inCombat, partiallySentIds)
     if inCombat then
         for i = #self.messages, 1, -1 do
             local message = self.messages[i]
-            if message:IsRelevantInCombat() and not message:IsBlockedByPartiallySent(partiallySentIds) then
+            if message:IsRelevantInCombat() and not self:IsBlockedByPartiallySent(message) then
                 return self:DequeueMessage(i)
             end
         end
     end
 
     for i = #self.messages, 1, -1 do
-        if not self.messages[i]:IsBlockedByPartiallySent(partiallySentIds) then
+        if not self:IsBlockedByPartiallySent(self.messages[i]) then
             return self:DequeueMessage(i)
         end
     end
 end
 
-function MessageQueue:GetNextRelevantEntry(inCombat, partiallySentIds)
-    if #self.messages == 0 then return end
-
-    table.sort(self.messages, bySizeDescAndTimeAddedDesc)
-
-    if inCombat then
-        for i = #self.messages, 1, -1 do
-            if self.messages[i]:IsRelevantInCombat() and not self.messages[i]:IsBlockedByPartiallySent(partiallySentIds) then
-                return self:DequeueMessage(i)
-            end
-        end
-    end
-
-    for i = #self.messages, 1, -1 do
-        if not self.messages[i]:IsBlockedByPartiallySent(partiallySentIds) then
-            return self:DequeueMessage(i)
-        end
-    end
-end
-
-function MessageQueue:GetNextRelevantEntryWithExactSize(size, inCombat, partiallySentIds)
+function MessageQueue:GetNextRelevantEntry(inCombat)
     if #self.messages == 0 then return end
 
     table.sort(self.messages, bySizeDescAndTimeAddedDesc)
@@ -144,7 +133,28 @@ function MessageQueue:GetNextRelevantEntryWithExactSize(size, inCombat, partiall
     if inCombat then
         for i = #self.messages, 1, -1 do
             local message = self.messages[i]
-            if message:IsRelevantInCombat() and message:GetSize() == size and not message:IsBlockedByPartiallySent(partiallySentIds) then
+            if message:IsRelevantInCombat() and not self:IsBlockedByPartiallySent(message) then
+                return self:DequeueMessage(i)
+            end
+        end
+    end
+
+    for i = #self.messages, 1, -1 do
+        if not self:IsBlockedByPartiallySent(self.messages[i]) then
+            return self:DequeueMessage(i)
+        end
+    end
+end
+
+function MessageQueue:GetNextRelevantEntryWithExactSize(size, inCombat)
+    if #self.messages == 0 then return end
+
+    table.sort(self.messages, bySizeDescAndTimeAddedDesc)
+
+    if inCombat then
+        for i = #self.messages, 1, -1 do
+            local message = self.messages[i]
+            if message:IsRelevantInCombat() and message:GetSize() == size and not self:IsBlockedByPartiallySent(message) then
                 return self:DequeueMessage(i)
             end
         end
@@ -152,8 +162,16 @@ function MessageQueue:GetNextRelevantEntryWithExactSize(size, inCombat, partiall
 
     for i = #self.messages, 1, -1 do
         local message = self.messages[i]
-        if message:GetSize() == size and not message:IsBlockedByPartiallySent(partiallySentIds) then
+        if message:GetSize() == size and not self:IsBlockedByPartiallySent(message) then
             return self:DequeueMessage(i)
         end
     end
+end
+
+function MessageQueue:IsBlockedByPartiallySent(message)
+    local protocolId = message:GetId()
+    if not self.partialMessageForProtocol[protocolId] then
+        return false
+    end
+    return self.partialMessageForProtocol[protocolId] ~= message
 end

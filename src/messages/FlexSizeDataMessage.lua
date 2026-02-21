@@ -59,10 +59,6 @@ function FlexSizeDataMessage:IsPartiallySent()
     return self.bytesSent > 0 and not self:IsFullySent()
 end
 
-function FlexSizeDataMessage:IsBlockedByPartiallySent(partiallySentIds)
-    return partiallySentIds and not self:IsPartiallySent() and partiallySentIds[self:GetId()] or false
-end
-
 function FlexSizeDataMessage:ShouldRequeue()
     return not self:IsFullySent()
 end
