@@ -71,6 +71,17 @@ function MessageQueue:GetSize()
     return #self.messages
 end
 
+function MessageQueue:GetPartiallySentIds()
+    local ids
+    for _, message in ipairs(self.messages) do
+        if message:IsPartiallySent() then
+            if not ids then ids = {} end
+            ids[message:GetId()] = true
+        end
+    end
+    return ids
+end
+
 function MessageQueue:HasRelevantMessages(inCombat)
     if inCombat then
         for _, message in ipairs(self.messages) do
@@ -84,39 +95,48 @@ function MessageQueue:HasRelevantMessages(inCombat)
     end
 end
 
-function MessageQueue:GetOldestRelevantMessage(inCombat)
+function MessageQueue:GetOldestRelevantMessage(inCombat, partiallySentIds)
     if #self.messages == 0 then return end
 
     table.sort(self.messages, byTimeAddedDesc)
 
     if inCombat then
         for i = #self.messages, 1, -1 do
-            if self.messages[i]:IsRelevantInCombat() then
+            local message = self.messages[i]
+            if message:IsRelevantInCombat() and not message:IsBlockedByPartiallySent(partiallySentIds) then
                 return self:DequeueMessage(i)
             end
         end
     end
 
-    return self:DequeueMessage()
+    for i = #self.messages, 1, -1 do
+        if not self.messages[i]:IsBlockedByPartiallySent(partiallySentIds) then
+            return self:DequeueMessage(i)
+        end
+    end
 end
 
-function MessageQueue:GetNextRelevantEntry(inCombat)
+function MessageQueue:GetNextRelevantEntry(inCombat, partiallySentIds)
     if #self.messages == 0 then return end
 
     table.sort(self.messages, bySizeDescAndTimeAddedDesc)
 
     if inCombat then
         for i = #self.messages, 1, -1 do
-            if self.messages[i]:IsRelevantInCombat() then
+            if self.messages[i]:IsRelevantInCombat() and not self.messages[i]:IsBlockedByPartiallySent(partiallySentIds) then
                 return self:DequeueMessage(i)
             end
         end
     end
 
-    return self:DequeueMessage()
+    for i = #self.messages, 1, -1 do
+        if not self.messages[i]:IsBlockedByPartiallySent(partiallySentIds) then
+            return self:DequeueMessage(i)
+        end
+    end
 end
 
-function MessageQueue:GetNextRelevantEntryWithExactSize(size, inCombat)
+function MessageQueue:GetNextRelevantEntryWithExactSize(size, inCombat, partiallySentIds)
     if #self.messages == 0 then return end
 
     table.sort(self.messages, bySizeDescAndTimeAddedDesc)
@@ -124,14 +144,15 @@ function MessageQueue:GetNextRelevantEntryWithExactSize(size, inCombat)
     if inCombat then
         for i = #self.messages, 1, -1 do
             local message = self.messages[i]
-            if message:IsRelevantInCombat() and message:GetSize() == size then
+            if message:IsRelevantInCombat() and message:GetSize() == size and not message:IsBlockedByPartiallySent(partiallySentIds) then
                 return self:DequeueMessage(i)
             end
         end
     end
 
     for i = #self.messages, 1, -1 do
-        if self.messages[i]:GetSize() == size then
+        local message = self.messages[i]
+        if message:GetSize() == size and not message:IsBlockedByPartiallySent(partiallySentIds) then
             return self:DequeueMessage(i)
         end
     end
